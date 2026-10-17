@@ -1,0 +1,444 @@
+/* ============================================================
+   FoodSoulOrbit — 旋转星环
+   ============================================================ */
+
+.orbit-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.orbit {
+  --stage: 620px;
+  --r: calc(var(--stage) * 0.372);
+  --node: calc(var(--stage) * 0.2);
+  --disc: calc(var(--stage) * 0.43);
+  --dur: 50s;
+  position: relative;
+  width: var(--stage);
+  height: var(--stage);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  touch-action: manipulation;
+}
+
+@media (max-width: 1240px) {
+  .orbit {
+    --stage: 540px;
+  }
+}
+
+@media (max-width: 1080px) {
+  .orbit {
+    --stage: 500px;
+  }
+}
+
+@media (max-width: 720px) {
+  .orbit {
+    --stage: min(88vw, 420px);
+    --node: calc(var(--stage) * 0.19);
+    --r: calc(var(--stage) * 0.375);
+    --disc: calc(var(--stage) * 0.42);
+  }
+}
+
+@media (max-width: 400px) {
+  .orbit {
+    --stage: 86vw;
+  }
+}
+
+/* ------------------------------ 轨道装饰 ------------------------------ */
+
+.orbit-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.orbit-ring--main {
+  width: calc(var(--r) * 2);
+  height: calc(var(--r) * 2);
+  border: 1px solid rgba(23, 19, 15, 0.1);
+  box-shadow: 0 0 60px rgba(232, 167, 102, 0.1) inset;
+}
+
+.orbit-ring--outer {
+  width: calc(var(--r) * 2 + 54px);
+  height: calc(var(--r) * 2 + 54px);
+  border: 1px dashed rgba(23, 19, 15, 0.09);
+  animation: spin-slow 160s linear infinite;
+}
+
+.orbit-ring--inner {
+  width: calc(var(--disc) * 1.34);
+  height: calc(var(--disc) * 1.34);
+  border: 1px solid rgba(23, 19, 15, 0.06);
+}
+
+.orbit-ticks {
+  position: absolute;
+  width: calc(var(--r) * 2 + 20px);
+  height: calc(var(--r) * 2 + 20px);
+  border-radius: 50%;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    rgba(23, 19, 15, 0.22) 0deg 0.5deg,
+    transparent 0.5deg 7.5deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 0 95.6%, #000 96% 98.6%, transparent 99%);
+  mask: radial-gradient(circle, transparent 0 95.6%, #000 96% 98.6%, transparent 99%);
+  opacity: 0.45;
+}
+
+/* ------------------------------ 旋转层 ------------------------------ */
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-rotor {
+  position: absolute;
+  inset: 0;
+  animation: orbit-spin var(--dur) linear infinite;
+  will-change: transform;
+  z-index: 2;
+}
+
+.orbit-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--a)) translate(var(--r)) rotate(calc(-1 * var(--a)));
+}
+
+.orbit-counter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  animation: orbit-spin var(--dur) linear infinite reverse;
+}
+
+.orbit.is-paused .orbit-rotor,
+.orbit.is-paused .orbit-counter,
+.orbit.is-paused .orbit-ring--outer {
+  animation-play-state: paused;
+}
+
+/* ------------------------------ 节点 ------------------------------ */
+
+.orbit-node {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  width: var(--node);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--stage) * 0.011);
+  text-align: center;
+}
+
+.orbit-node__disc {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  padding: 4px;
+  background: #fdfaf4;
+  border: 1px solid rgba(23, 19, 15, 0.09);
+  box-shadow:
+    0 10px 22px rgba(70, 48, 24, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  transition:
+    transform 0.42s var(--ease),
+    box-shadow 0.42s var(--ease),
+    background 0.42s var(--ease),
+    border-color 0.42s var(--ease);
+}
+
+.orbit-node__disc .photo {
+  border-radius: 50%;
+  transition: filter 0.42s var(--ease);
+}
+
+.orbit-node__halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(232, 167, 102, 0);
+  transition: all 0.42s var(--ease);
+  pointer-events: none;
+}
+
+.orbit-node:hover .orbit-node__disc {
+  transform: scale(1.07);
+  box-shadow:
+    0 18px 38px rgba(70, 48, 24, 0.2),
+    0 0 0 5px rgba(232, 167, 102, 0.12);
+}
+
+.orbit-node:hover .orbit-node__halo {
+  border-color: rgba(232, 167, 102, 0.5);
+  inset: -9px;
+}
+
+.orbit-node__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.2;
+}
+
+.orbit-node__name {
+  font-size: clamp(10px, calc(var(--stage) * 0.0205), 12.5px);
+  font-weight: 600;
+  color: #17130f;
+  letter-spacing: 0.01em;
+  transition: color 0.3s var(--ease);
+}
+
+.orbit-node__tag {
+  font-size: clamp(8.5px, calc(var(--stage) * 0.0165), 10px);
+  color: #8a7f72;
+  letter-spacing: 0.02em;
+}
+
+.orbit-node__region {
+  font-size: clamp(8px, calc(var(--stage) * 0.0135), 9.5px);
+  color: #a89c8b;
+  letter-spacing: 0.02em;
+}
+
+.orbit-node.is-active .orbit-node__region {
+  color: #a06a3c;
+}
+
+.orbit-node.is-active .orbit-node__disc {
+  background: #17130f;
+  border-color: rgba(23, 19, 15, 0.9);
+  transform: scale(1.05);
+  box-shadow:
+    0 20px 40px rgba(40, 26, 12, 0.28),
+    0 0 0 4px rgba(232, 167, 102, 0.32);
+}
+
+.orbit-node.is-active .orbit-node__halo {
+  border-color: rgba(232, 167, 102, 0.85);
+  inset: -10px;
+}
+
+.orbit-node.is-active .orbit-node__name {
+  color: #b9541f;
+}
+
+.orbit-node.is-active .orbit-node__tag {
+  color: #a06a3c;
+}
+
+.orbit-node:focus-visible {
+  outline: none;
+}
+
+.orbit-node:focus-visible .orbit-node__disc {
+  box-shadow:
+    0 0 0 3px #f7f1e7,
+    0 0 0 6px rgba(198, 93, 59, 0.85);
+}
+
+/* ------------------------------ 中心圆盘 ------------------------------ */
+
+.orbit-disc {
+  position: relative;
+  z-index: 5;
+  width: var(--disc);
+  height: var(--disc);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--disc) * 0.11);
+  text-align: center;
+  overflow: hidden;
+  background:
+    radial-gradient(115% 115% at 32% 16%, #fffdf9 0%, #f8f1e5 52%, #ebdfcb 100%);
+  box-shadow:
+    0 34px 70px rgba(70, 48, 24, 0.16),
+    0 2px 0 rgba(255, 255, 255, 0.95) inset,
+    0 0 0 1px rgba(23, 19, 15, 0.06);
+}
+
+/* 中心暖光：放在旋转层之下，避免遮住节点文字 */
+.orbit-glow {
+  position: absolute;
+  z-index: 1;
+  width: calc(var(--disc) * 1.5);
+  height: calc(var(--disc) * 1.5);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 167, 102, 0.28), transparent 62%);
+  filter: blur(14px);
+  pointer-events: none;
+}
+
+.orbit-disc__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: disc-in 0.5s var(--ease-out) both;
+}
+
+@keyframes disc-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.985);
+  }
+}
+
+.orbit-disc__brand {
+  font-size: clamp(9px, calc(var(--stage) * 0.018), 12px);
+  letter-spacing: 0.3em;
+  color: #8a7f72;
+  font-weight: 600;
+}
+
+.orbit-disc__label {
+  font-size: clamp(8.5px, calc(var(--stage) * 0.0145), 10px);
+  letter-spacing: 0.18em;
+  color: #a89c8b;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.orbit-disc__title {
+  font-size: clamp(15px, calc(var(--stage) * 0.036), 24px);
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #17130f;
+}
+
+.orbit-disc__title--brand {
+  font-size: clamp(14px, calc(var(--stage) * 0.032), 21px);
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.orbit-disc__desc {
+  font-size: clamp(10px, calc(var(--stage) * 0.0195), 12px);
+  line-height: 1.55;
+  color: #6f655a;
+  max-width: 100%;
+}
+
+.orbit-disc__quote {
+  display: block;
+  margin-top: 3px;
+  color: #a06a3c;
+  font-size: 0.95em;
+}
+
+.orbit-disc__cta {
+  margin-top: 8px;
+  height: 34px;
+  padding: 0 15px;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.orbit-disc__cta .arrow {
+  font-size: 11px;
+}
+
+/* ------------------------------ 提示 ------------------------------ */
+
+.orbit-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: #8a7f72;
+}
+
+.orbit-hint__sep {
+  opacity: 0.4;
+}
+
+/* ------------------------------ 响应式细节 ------------------------------ */
+
+@media (max-width: 720px) {
+  .orbit-node {
+    gap: 0;
+  }
+  .orbit-node__meta {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(23, 19, 15, 0.74);
+    padding: 1px 8px;
+    border-radius: 999px;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    max-width: 96%;
+    overflow: hidden;
+  }
+  .orbit-node__name {
+    font-size: 9.5px;
+    color: #f9f4ea;
+    white-space: nowrap;
+  }
+  .orbit-node__tag {
+    display: none;
+  }
+  .orbit-node__region {
+    display: none;
+  }
+  .orbit-node.is-active .orbit-node__meta {
+    background: #c65d3b;
+  }
+  .orbit-node.is-active .orbit-node__name {
+    color: #fff5ea;
+  }
+  .orbit-disc {
+    padding: calc(var(--disc) * 0.115);
+  }
+  .orbit-disc__desc {
+    display: none;
+  }
+  .orbit-disc__cta {
+    margin-top: 4px;
+  }
+  .orbit-hint {
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 400px) {
+  .orbit-disc__label {
+    display: none;
+  }
+  .orbit-node__name {
+    font-size: 10px;
+  }
+}
+
+/* 减少动态效果：停止自转，保留静态环形布局 */
+@media (prefers-reduced-motion: reduce) {
+  .orbit-rotor,
+  .orbit-counter,
+  .orbit-ring--outer {
+    animation: none !important;
+  }
+}

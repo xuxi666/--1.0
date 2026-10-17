@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+*.log
+
+# 用户上传的照片
+public/uploads/*
+!public/uploads/.gitkeep
+
+# 社区数据（服务端存储：帖子 / 回复 / 点赞；只忽略仓库根目录的 data/，不影响 src/data/）
+/data/
