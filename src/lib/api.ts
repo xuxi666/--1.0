@@ -5,6 +5,8 @@ import type {
   RecipeResponse,
   RecommendInput,
   RecommendResponse,
+  VideoPlatform,
+  VideoSearchBundle,
 } from '../types'
 import type { CommunityPost, CommunitySnapshot, PostKind, PostReply } from '../data/community'
 
@@ -101,11 +103,56 @@ async function streamSseChat(
 /** 角色多轮对话（流式）。返回是否处于演示模式。 */
 export function chatWithCharacter(options: {
   characterId: string
+  /** 可选的菜品上下文（来自菜品图鉴详情页）；服务端会校验这道菜是否属于该角色 */
+  dishId?: string
   messages: ChatMessage[]
   onDelta: (text: string) => void
   signal?: AbortSignal
 }): Promise<{ demo: boolean }> {
-  return streamSseChat('/api/chat', { characterId: options.characterId, messages: options.messages }, options)
+  return streamSseChat(
+    '/api/chat',
+    { characterId: options.characterId, dishId: options.dishId, messages: options.messages },
+    options,
+  )
+}
+
+/**
+ * 菜系专属对话（流式）：请求携带 cuisineId，
+ * 服务端校验是否为八大菜系之一，并选择该菜系的系统提示词。返回是否处于演示模式。
+ */
+export function chatWithCuisine(options: {
+  cuisineId: string
+  /** 可选的菜品上下文（来自菜品图鉴详情页）；服务端会校验这道菜是否属于该菜系 */
+  dishId?: string
+  messages: ChatMessage[]
+  onDelta: (text: string) => void
+  signal?: AbortSignal
+}): Promise<{ demo: boolean }> {
+  return streamSseChat(
+    '/api/cuisine-chat',
+    { cuisineId: options.cuisineId, dishId: options.dishId, messages: options.messages },
+    options,
+  )
+}
+
+/**
+ * 口味专属对话（流式）：请求携带 tasteId，
+ * 服务端校验是否为八种口味之一，并选择该口味的系统提示词。
+ * tasteId 只用于口味人格，服务端不会把它当作 cuisineId / characterId。返回是否处于演示模式。
+ */
+export function chatWithTaste(options: {
+  tasteId: string
+  /** 可选的菜品上下文（只有该口味的代表菜才会被服务端注入） */
+  dishId?: string
+  messages: ChatMessage[]
+  onDelta: (text: string) => void
+  signal?: AbortSignal
+}): Promise<{ demo: boolean }> {
+  return streamSseChat(
+    '/api/taste-chat',
+    { tasteId: options.tasteId, dishId: options.dishId, messages: options.messages },
+    options,
+  )
 }
 
 /** 首页美食小精灵：通用助手（无角色人格，SSE 流式）。返回是否处于演示模式。 */
@@ -141,6 +188,24 @@ export function recommendDishes(
 
 export function getRelatedDishes(characterId: string, signal?: AbortSignal): Promise<RelatedDishesResponse> {
   return postJson<RelatedDishesResponse>('/api/related-dishes', { characterId }, signal)
+}
+
+/**
+ * 做菜视频搜索：服务端真实检索 B 站等平台并返回可点击结果 + 平台搜索入口。
+ * 结果全部来自真实检索（或平台官方搜索页），与 AI 生成文本严格分离。
+ */
+export function searchCookingVideos(
+  input: {
+    text: string
+    contextCharacterId?: string
+    contextCuisineId?: string
+    contextTasteId?: string
+    platforms?: VideoPlatform[]
+    limit?: number
+  },
+  signal?: AbortSignal,
+): Promise<VideoSearchBundle> {
+  return postJson<VideoSearchBundle>('/api/videos/search', input, signal)
 }
 
 /* ------------------------------ 社区（服务端存储） ------------------------------ */

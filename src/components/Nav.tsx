@@ -4,10 +4,11 @@ import { useScrollY } from '../lib/hooks'
 
 const links = [
   { label: '首页', to: '/', hash: 'top' },
-  { label: '美食人格', to: '/#personalities', hash: 'personalities' },
-  { label: 'AI 菜谱', to: '/#recipe-lab', hash: 'recipe-lab' },
-  { label: '智能推荐', to: '/#recommend', hash: 'recommend' },
-  { label: '美食社区', to: '/#community', hash: 'community' },
+  { label: '美食图鉴', to: '/dishes' },
+  { label: '美食人格', to: '/explore#personalities', hash: 'personalities' },
+  { label: 'AI 菜谱', to: '/explore#recipe-lab', hash: 'recipe-lab' },
+  { label: '智能推荐', to: '/explore#recommend', hash: 'recommend' },
+  { label: '美食社区', to: '/explore#community', hash: 'community' },
 ]
 
 export default function Nav() {
@@ -63,11 +64,17 @@ export default function Nav() {
             const active =
               link.to === '/'
                 ? location.pathname === '/' && !location.hash
-                : link.to.startsWith('/#')
-                  ? location.pathname === '/' && location.hash === `#${link.hash}`
-                  : location.pathname === link.to
+                : link.to.startsWith('/explore#')
+                  ? location.pathname === '/explore' && location.hash === `#${link.hash}`
+                  : link.to === '/dishes'
+                    ? location.pathname.startsWith('/dishes')
+                    : location.pathname === link.to
             return (
-              <Link key={link.label} to={link.to} className={`nav__link ${active ? 'is-active' : ''}`}>
+              <Link
+                key={link.label}
+                to={link.to}
+                className={`nav__link ${active ? 'is-active' : ''}`}
+              >
                 {link.label}
               </Link>
             )
@@ -94,7 +101,11 @@ export default function Nav() {
       <div className={`nav__mobile ${open ? 'is-open' : ''}`}>
         <div className="nav__mobile-inner">
           {links.map((link) => (
-            <Link key={link.label} to={link.to} className="nav__mobile-link">
+            <Link
+              key={link.label}
+              to={link.to}
+              className="nav__mobile-link"
+            >
               {link.label}
               <span aria-hidden="true">→</span>
             </Link>

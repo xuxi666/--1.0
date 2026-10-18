@@ -7,7 +7,9 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 100;
+  /* 高于转场揭示层（240）与悬浮精灵（200）：站点导航在转场期间保持原位，
+     不会出现「被圆形盖住又突然弹回」的跳动 */
+  z-index: 300;
   border-bottom: 1px solid transparent;
   transition:
     background 0.45s var(--ease),

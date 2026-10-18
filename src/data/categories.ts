@@ -1,4 +1,4 @@
-import { characters } from './characters'
+import { characterMap, characters } from './characters'
 
 export type Category = {
   id: string
@@ -10,8 +10,12 @@ export type Category = {
   representatives: string[]
   palette: { base: string; deep: string; light: string }
   emoji: string
-  /** 代表菜品的照片名 */
-  photoName: string
+  /**
+   * 该口味方向的「代言角色」：
+   * 分类页主图、主按钮与文案统一以这个角色的身份展示，
+   * 不再用数组下标 members[0] 隐式挑选，避免「浓香派却和烧烤聊聊」式的错配。
+   */
+  featuredCharacterId: string
 }
 
 export const categories: Category[] = [
@@ -25,7 +29,7 @@ export const categories: Category[] = [
     representatives: ['麻婆豆腐', '重庆火锅', '水煮鱼', '川菜'],
     palette: { base: '#C0392B', deep: '#4E0F0A', light: '#F3B79E' },
     emoji: '🌶️',
-    photoName: '麻婆豆腐',
+    featuredCharacterId: 'mapo',
   },
   {
     id: 'xianxiang',
@@ -37,7 +41,7 @@ export const categories: Category[] = [
     representatives: ['小笼包', '粤菜'],
     palette: { base: '#8FA98C', deep: '#2F4234', light: '#DCE7D6' },
     emoji: '🐟',
-    photoName: '小笼包',
+    featuredCharacterId: 'xiaolongbao',
   },
   {
     id: 'nongxiang',
@@ -49,7 +53,7 @@ export const categories: Category[] = [
     representatives: ['东坡肉', '红烧肉', '烧烤'],
     palette: { base: '#8C4A2B', deep: '#361508', light: '#E7C3A0' },
     emoji: '🍖',
-    photoName: '东坡肉',
+    featuredCharacterId: 'dongpo',
   },
   {
     id: 'qingshuang',
@@ -61,7 +65,7 @@ export const categories: Category[] = [
     representatives: ['江南菜'],
     palette: { base: '#7E9C9A', deep: '#22383A', light: '#DCE9E4' },
     emoji: '🌿',
-    photoName: '龙井虾仁',
+    featuredCharacterId: 'jiangnan',
   },
   {
     id: 'suanxiang',
@@ -73,7 +77,7 @@ export const categories: Category[] = [
     representatives: ['酸菜鱼', '街头小吃'],
     palette: { base: '#B7A24A', deep: '#3A3312', light: '#EDE4BC' },
     emoji: '🥬',
-    photoName: '酸菜鱼',
+    featuredCharacterId: 'suancaiyu',
   },
   {
     id: 'tianrun',
@@ -85,7 +89,7 @@ export const categories: Category[] = [
     representatives: ['汤圆', '甜品'],
     palette: { base: '#D98AA6', deep: '#5A2438', light: '#F7DDE6' },
     emoji: '🍮',
-    photoName: '汤圆',
+    featuredCharacterId: 'tangyuan',
   },
   {
     id: 'fajiao',
@@ -97,7 +101,7 @@ export const categories: Category[] = [
     representatives: ['臭豆腐'],
     palette: { base: '#6E7A4A', deep: '#242A12', light: '#D8DCC0' },
     emoji: '🫘',
-    photoName: '臭豆腐',
+    featuredCharacterId: 'choudoufu',
   },
   {
     id: 'jiachang',
@@ -109,7 +113,7 @@ export const categories: Category[] = [
     representatives: ['兰州牛肉面', '面食'],
     palette: { base: '#C9A06A', deep: '#4A3520', light: '#F0DFC6' },
     emoji: '🍜',
-    photoName: '兰州牛肉面',
+    featuredCharacterId: 'lanzhou',
   },
 ]
 
@@ -119,6 +123,12 @@ export const categoryMap: Record<string, Category> = Object.fromEntries(
 
 export function charactersOfCategory(categoryId: string) {
   return characters.filter((c) => c.categoryId === categoryId)
+}
+
+/** 分类的代言角色（主图 / 主按钮统一使用它，非法配置返回 undefined 而不是乱指） */
+export function featuredCharacterOfCategory(categoryId: string) {
+  const category = categoryMap[categoryId]
+  return category ? characterMap[category.featuredCharacterId] : undefined
 }
 
 export function categoryName(id: string) {

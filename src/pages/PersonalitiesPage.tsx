@@ -3,7 +3,7 @@ import Reveal from '../components/Reveal'
 import CharacterCard from '../components/CharacterCard'
 import FoodPhoto from '../components/FoodPhoto'
 import FoodTypeTags from '../components/FoodTypeTags'
-import { categories } from '../data/categories'
+import { categories, featuredCharacterOfCategory } from '../data/categories'
 import { characters } from '../data/characters'
 import { cuisines } from '../data/cuisines'
 
@@ -82,7 +82,12 @@ export default function PersonalitiesPage() {
               <Reveal key={category.id} delay={index * 40}>
                 <Link to={`/personalities/${category.id}`} className="cat-tile">
                   <div className="cat-tile__visual">
-                    <FoodPhoto name={category.photoName} emoji={category.emoji} palette={category.palette} alt={category.name} />
+                    <FoodPhoto
+                      name={featuredCharacterOfCategory(category.id)?.name ?? category.name}
+                      emoji={category.emoji}
+                      palette={category.palette}
+                      alt={category.name}
+                    />
                   </div>
                   <div className="cat-tile__body">
                     <div className="cat-tile__row">

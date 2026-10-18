@@ -11,3 +11,9 @@ public/uploads/*
 
 # 社区数据（服务端存储：帖子 / 回复 / 点赞；只忽略仓库根目录的 data/，不影响 src/data/）
 /data/
+
+# ui-check 的 UTF-8 失败清单（每次运行重新生成）
+tmp-ui-summary.txt
+
+# 本地参考副本（独立的 2.0 试验目录，带 node_modules/dist，不随本站上传）
+aimeishi2.0/

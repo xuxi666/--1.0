@@ -10,9 +10,9 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`))
 
-await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' })
+await page.goto('http://127.0.0.1:5173/explore', { waitUntil: 'networkidle' })
 
-// --- 菜谱生成 ---
+// --- 菜谱生成（原首页区块已搬到 /explore） ---
 await page.locator('#recipe-lab').scrollIntoViewIfNeeded()
 await page.locator('.quick-row__item').first().click()
 await page.locator('#rw-dish').waitFor({ state: 'visible' })

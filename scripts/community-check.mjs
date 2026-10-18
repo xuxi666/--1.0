@@ -19,7 +19,7 @@ const track = (page, tag) => {
   page.on('pageerror', (e) => errors.push(`[${tag}] ${e.message}`))
 }
 
-const TITLE = '热点同步测试帖'
+const TITLE = `热点同步测试帖 ${Date.now().toString(36)}`
 const BODY = '这条帖子应当被另一个浏览器（舍友）看到。'
 let failures = 0
 const check = (label, ok) => {
@@ -92,23 +92,23 @@ check(`A 刷新后点赞数 = ${likeCount.trim()}（应为 2）`, likeCount.incl
 const likedState = await cardA2.getByLabel('取消点赞').count()
 check('A 的点赞状态在刷新后保留', likedState === 1)
 
-/* ---------- 首页：能看到新帖并回复 ---------- */
-await pa.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+/* ---------- 探索页：能看到新帖并回复（原首页社区区块已搬到 /explore） ---------- */
+await pa.goto(`${BASE}/explore`, { waitUntil: 'networkidle' })
 const homeCard = pa.locator('.community-home .fs-post', { hasText: TITLE })
 await homeCard.waitFor({ timeout: 8000 })
-check('首页社区区能看到新帖', true)
+check('探索页社区区能看到新帖', true)
 await homeCard.getByLabel('回复').click()
-await homeCard.locator('.fs-reply-form textarea').fill('从首页回的')
+await homeCard.locator('.fs-reply-form textarea').fill('从探索页回的')
 await homeCard.locator('.fs-reply-form button').click()
-await homeCard.locator('.fs-reply', { hasText: '从首页回的' }).waitFor({ timeout: 5000 })
-check('首页可以直接回复', true)
+await homeCard.locator('.fs-reply', { hasText: '从探索页回的' }).waitFor({ timeout: 5000 })
+check('探索页可以直接回复', true)
 
-/* ---------- 回到社区页确认首页回复已同步 ---------- */
+/* ---------- 回到社区页确认探索页回复已同步 ---------- */
 await pa.goto(`${BASE}/community`, { waitUntil: 'networkidle' })
 const cardA3 = pa.locator('.fs-post', { hasText: TITLE })
 await cardA3.getByLabel('回复').click()
-await cardA3.locator('.fs-reply', { hasText: '从首页回的' }).waitFor({ timeout: 5000 })
-check('首页回复在社区页可见（同一数据源）', true)
+await cardA3.locator('.fs-reply', { hasText: '从探索页回的' }).waitFor({ timeout: 5000 })
+check('探索页回复在社区页可见（同一数据源）', true)
 
 /* ---------- 移动端无横向溢出 ---------- */
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })

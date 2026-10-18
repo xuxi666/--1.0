@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import FoodPhoto from './FoodPhoto'
 import { recommendDishes } from '../lib/api'
 import { dishMap } from '../data/dishes'
 import { categoryName } from '../data/categories'
+import { cuisineMap, cuisines } from '../data/cuisines'
 import { characterMap } from '../data/characters'
 import type { RecommendResponse } from '../types'
 
@@ -16,7 +17,14 @@ const MINUTES = [20, 30, 45, 90]
 const REGIONS = ['不限', '川渝', '粤港', '西北', '江浙', '北方', '东北', '湘赣', '云贵']
 const AVOID = ['大豆', '小麦', '鸡蛋', '牛奶', '鱼类', '虾', '花生', '芝麻']
 
-export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string }) {
+export default function RecommendPanel({
+  idPrefix = 'rp',
+  initialCuisine = '',
+}: {
+  idPrefix?: string
+  /** 从菜系页进入时预选的菜系（八大菜系 id），空字符串表示不限 */
+  initialCuisine?: string
+}) {
   const [mood, setMood] = useState('疲惫')
   const [flavors, setFlavors] = useState<string[]>(['麻辣'])
   const [spicy, setSpicy] = useState(2)
@@ -24,7 +32,12 @@ export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string 
   const [people, setPeople] = useState(2)
   const [minutes, setMinutes] = useState(45)
   const [region, setRegion] = useState('不限')
+  const [cuisine, setCuisine] = useState(initialCuisine)
   const [avoid, setAvoid] = useState<string[]>([])
+
+  useEffect(() => {
+    setCuisine(initialCuisine)
+  }, [initialCuisine])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -47,6 +60,7 @@ export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string 
         people,
         minutes,
         region,
+        cuisine,
         avoid,
       })
       setResult(data)
@@ -165,7 +179,7 @@ export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string 
         </div>
 
         <div className="recommend__group">
-          <span className="field__label">地域菜系</span>
+          <span className="field__label">地域偏好</span>
           <div className="opt-row">
             {REGIONS.map((item) => (
               <button
@@ -176,6 +190,31 @@ export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string 
                 onClick={() => setRegion(item)}
               >
                 {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="recommend__group">
+          <span className="field__label">限定菜系（可选）</span>
+          <div className="opt-row">
+            <button
+              type="button"
+              className="opt"
+              aria-pressed={cuisine === ''}
+              onClick={() => setCuisine('')}
+            >
+              不限
+            </button>
+            {cuisines.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="opt"
+                aria-pressed={cuisine === item.id}
+                onClick={() => setCuisine(item.id)}
+              >
+                {item.name}
               </button>
             ))}
           </div>
@@ -204,7 +243,7 @@ export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string 
             {!loading && <span className="arrow">→</span>}
           </button>
           <span className="workbench__hint">
-            先从菜品库筛选，再让 AI 写推荐理由 · 不凭空生成菜品
+            先从菜品库筛选（可限定菜系），再让 AI 写推荐理由 · 不凭空生成菜品
           </span>
         </div>
       </form>
@@ -231,6 +270,21 @@ export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string 
             </span>
           </div>
 
+          {result.results.length === 0 && (
+            <div className="page-note recommend__empty">
+              <h3>这个筛选条件下暂时没有菜品</h3>
+              <ul>
+                <li>
+                  {cuisine
+                    ? `菜品库里暂时没有明确归属「${
+                        cuisines.find((item) => item.id === cuisine)?.name ?? cuisine
+                      }」的候选菜——我们不会用其他菜系的菜来凑数。可以放宽菜系条件，或去 AI 菜谱直接生成想吃的菜。`
+                    : '试试放宽辣度、预算、时间或忌口条件。'}
+                </li>
+              </ul>
+            </div>
+          )}
+
           <div className="dish-grid">
             {result.results.map((item, index) => {
               const dish = dishMap[item.id]
@@ -246,6 +300,9 @@ export default function RecommendPanel({ idPrefix = 'rp' }: { idPrefix?: string 
                       <h4>{dish.name}</h4>
                       <span className="dish-card__cat">
                         {categoryName(dish.categoryId)} · {dish.region}
+                        {dish.cuisineId && (
+                          <em className="dish-card__cuisine">{cuisineMap[dish.cuisineId].name}</em>
+                        )}
                       </span>
                     </div>
                   </div>

@@ -3,6 +3,7 @@ import FoodPhoto from '../components/FoodPhoto'
 import Reveal from '../components/Reveal'
 import { getCharacter } from '../data/characters'
 import { categoryMap } from '../data/categories'
+import { cuisineOfCharacter } from '../data/cuisines'
 
 export default function CharacterPage() {
   const { id } = useParams()
@@ -22,6 +23,7 @@ export default function CharacterPage() {
   }
 
   const category = categoryMap[character.categoryId]
+  const cuisine = cuisineOfCharacter(character.id)
 
   return (
     <main className="page">
@@ -47,7 +49,14 @@ export default function CharacterPage() {
               <div className="char-panel__body">
                 <span className="char-panel__en">{character.en}</span>
                 <h1 className="char-panel__name">{character.name}</h1>
-                <span className="chip chip--accent">{category?.name ?? '美食'}</span>
+                <div className="char-panel__links">
+                  <span className="chip chip--accent">{category?.name ?? '美食'}</span>
+                  {cuisine && (
+                    <Link to={`/cuisines/${cuisine.id}`} className="chip chip--link">
+                      所属菜系 · {cuisine.name}
+                    </Link>
+                  )}
+                </div>
                 <div className="char-panel__traits">
                   {character.traits.map((trait) => (
                     <em key={trait}>{trait}</em>

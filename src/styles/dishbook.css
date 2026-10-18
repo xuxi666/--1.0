@@ -1,0 +1,572 @@
+/* ============================================================
+   美食图鉴（/dishes 列表 + /dishes/:id 详情）
+   ------------------------------------------------------------
+   复用全局设计变量：--card / --line / --accent / --radius-* / --ease
+   ============================================================ */
+
+/* ---------------- 图鉴页头部 ---------------- */
+
+.dishbook__intro {
+  padding-top: 12px;
+}
+
+.dishbook__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.dishbook__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.25s var(--ease), transform 0.25s var(--ease);
+}
+
+.dishbook__stat:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+}
+
+.dishbook__stat strong {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.dishbook__stat span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------------- 搜索与筛选 ---------------- */
+
+.dishbook__toolbar {
+  display: grid;
+  gap: 16px;
+  margin: 34px 0 20px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: linear-gradient(160deg, rgba(232, 167, 102, 0.06), rgba(21, 21, 24, 0.6));
+}
+
+.dishbook__search {
+  display: grid;
+  gap: 8px;
+}
+
+.dishbook__search label {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.dishbook__search input {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: rgba(11, 11, 13, 0.72);
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.dishbook__search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(232, 167, 102, 0.18);
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-row__label {
+  min-width: 64px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.filter-row__hint {
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.filter-chip {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+
+.filter-chip:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.filter-chip.is-on {
+  border-color: rgba(232, 167, 102, 0.8);
+  background: rgba(232, 167, 102, 0.16);
+  color: var(--accent);
+}
+
+.filter-chip--alt.is-on {
+  border-color: rgba(140, 190, 255, 0.6);
+  background: rgba(140, 190, 255, 0.12);
+  color: #9dc4f5;
+}
+
+/* 结果条 */
+
+.dishbook__result-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 18px 0 22px;
+}
+
+.dishbook__result-count {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ---------------- 列表网格 ---------------- */
+
+.dish-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+  gap: 18px;
+}
+
+.dish-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+}
+
+.dishbook-card {
+  height: 100%;
+}
+
+.dishbook-card__link {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.dishbook-card__link:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-4px);
+  box-shadow: 0 22px 44px -30px rgba(0, 0, 0, 0.9);
+}
+
+.dishbook-card__visual {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--bg-soft);
+}
+
+.dishbook-card__visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dishbook-card__pending {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(11, 11, 13, 0.78);
+  border: 1px solid var(--line-strong);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.dishbook-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px 18px;
+}
+
+.dishbook-card__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dishbook-card__name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.dishbook-card__owner {
+  flex: none;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.dishbook-card__summary {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.dishbook-card__flavors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dishbook-card__flavors em {
+  font-style: normal;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(245, 241, 235, 0.06);
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.dishbook-card__foot {
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* ---------------- 详情页 ---------------- */
+
+.dish-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 30px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.dish-hero__visual {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--bg-soft);
+  aspect-ratio: 4 / 3;
+}
+
+.dish-hero__visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dish-hero__pending {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(11, 11, 13, 0.8);
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dish-hero__copy {
+  display: grid;
+  gap: 12px;
+}
+
+.dish-hero__alias {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.dish-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.dish-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.dish-hero__context {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 2px solid rgba(232, 167, 102, 0.65);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: rgba(232, 167, 102, 0.07);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.dish-videos {
+  margin-top: 18px;
+}
+
+.dish-sections {
+  display: grid;
+  gap: 20px;
+  margin: 40px 0;
+}
+
+.dish-section {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--card);
+}
+
+.dish-section--split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 26px;
+}
+
+.dish-section__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.dish-section__badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 167, 102, 0.55);
+  background: rgba(232, 167, 102, 0.12);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.dish-section__text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.85;
+  color: var(--text);
+  opacity: 0.92;
+}
+
+.dish-section__list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.dish-section__hint {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.dish-section__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dish-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.dish-gallery__item {
+  width: 210px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--bg-soft);
+}
+
+.dish-gallery__item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.dish-gallery__item figcaption {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.dish-ingredients {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dish-ingredients li {
+  padding: 6px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(245, 241, 235, 0.04);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.chip--accent {
+  border-color: rgba(232, 167, 102, 0.55);
+  color: var(--accent);
+}
+
+.dish-facts {
+  display: grid;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--card);
+}
+
+.dish-facts p {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.dish-facts span {
+  color: var(--text);
+  opacity: 0.8;
+}
+
+/* ---------------- 聊天的菜品上下文条 ---------------- */
+
+.chat-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(232, 167, 102, 0.35);
+  border-radius: var(--radius-s);
+  background: rgba(232, 167, 102, 0.08);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.chat-context__label {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.chat-context__dish {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chat-context__from {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.chat-context__link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.chat-context__link:hover {
+  text-decoration: underline;
+}
+
+.chat-context__clear {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+
+.chat-context__clear:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.chat-empty__context {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-left: 2px solid rgba(232, 167, 102, 0.6);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: rgba(232, 167, 102, 0.06);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+/* ---------------- 响应式 ---------------- */
+
+@media (max-width: 900px) {
+  .dish-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .dish-facts p {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

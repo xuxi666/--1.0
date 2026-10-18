@@ -1,5 +1,6 @@
 /* ============================================================
-   FoodSoulOrbit — 旋转星环
+   FoodWheel / HomeFoodWheel — 旋转星环与模式切换
+   （.orbit* 类名同时服务「八大菜系」与「口味探索」两种模式）
    ============================================================ */
 
 .orbit-wrap {
@@ -10,8 +11,83 @@
   width: 100%;
 }
 
+/* ------------------------------ 模式切换（八大菜系 / 口味探索） ------------------------------ */
+
+.wheel-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #fdfaf4;
+  border: 1px solid rgba(23, 19, 15, 0.08);
+  box-shadow:
+    0 8px 22px rgba(70, 48, 24, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.wheel-mode__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 7px 18px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #6f655a;
+  transition:
+    color 0.3s var(--ease),
+    background 0.3s var(--ease),
+    box-shadow 0.3s var(--ease),
+    transform 0.3s var(--ease);
+}
+
+.wheel-mode__btn:hover {
+  color: #17130f;
+}
+
+.wheel-mode__btn[aria-pressed='true'] {
+  color: #f9f4ea;
+  background: #17130f;
+  box-shadow: 0 6px 16px rgba(23, 19, 15, 0.22);
+}
+
+.wheel-mode__btn:active {
+  transform: scale(0.97);
+}
+
+.wheel-mode__btn:focus-visible {
+  outline: 2px solid rgba(198, 93, 59, 0.85);
+  outline-offset: 2px;
+}
+
+/* 转盘入场：切换模式时轻微淡入 + 上移（prefers-reduced-motion 下关闭） */
+.wheel-stage {
+  display: flex;
+  justify-content: center;
+}
+
+.wheel-in {
+  animation: wheel-in 0.45s var(--ease-out) both;
+}
+
+@keyframes wheel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.992);
+  }
+}
+
 .orbit {
-  --stage: 620px;
+  /*
+   * --stage 同时受三件事约束：桌面最大尺寸、屏宽比例、以及全屏首页的剩余高度
+   * （导航 + 模式切换 + 提示 + 探索入口 + 留白 ≈ 252px）。
+   * 这样在短屏笔记本与手机横屏上转盘会自动缩小，不会被裁切或把页面撑出滚动。
+   */
+  --stage: min(620px, 86vw, calc(100dvh - 252px));
   --r: calc(var(--stage) * 0.372);
   --node: calc(var(--stage) * 0.2);
   --disc: calc(var(--stage) * 0.43);
@@ -25,21 +101,33 @@
   touch-action: manipulation;
 }
 
+/* 不支持动态视口高度的旧内核：退回静态 100vh 公式 */
+@supports not (height: 100dvh) {
+  .orbit {
+    --stage: min(620px, 86vw, calc(100vh - 252px));
+  }
+}
+
 @media (max-width: 1240px) {
   .orbit {
-    --stage: 540px;
+    --stage: min(540px, 86vw, calc(100dvh - 252px));
+  }
+  @supports not (height: 100dvh) {
+    .orbit {
+      --stage: min(540px, 86vw, calc(100vh - 252px));
+    }
   }
 }
 
 @media (max-width: 1080px) {
   .orbit {
-    --stage: 500px;
+    --stage: min(500px, 86vw, calc(100dvh - 252px));
   }
 }
 
 @media (max-width: 720px) {
   .orbit {
-    --stage: min(88vw, 420px);
+    --stage: min(88vw, 420px, calc(100dvh - 268px));
     --node: calc(var(--stage) * 0.19);
     --r: calc(var(--stage) * 0.375);
     --disc: calc(var(--stage) * 0.42);
@@ -48,7 +136,17 @@
 
 @media (max-width: 400px) {
   .orbit {
-    --stage: 86vw;
+    --stage: min(86vw, calc(100dvh - 268px));
+  }
+}
+
+/* 手机横屏 / 矮窗口：压缩上下留白，转盘按可用高度自适应 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .orbit {
+    --stage: min(78vw, 460px, calc(100dvh - 172px));
+    --node: calc(var(--stage) * 0.19);
+    --r: calc(var(--stage) * 0.375);
+    --disc: calc(var(--stage) * 0.42);
   }
 }
 
@@ -109,6 +207,10 @@
   animation: orbit-spin var(--dur) linear infinite;
   will-change: transform;
   z-index: 2;
+  /* 转子是整块旋转的方形：只让节点按钮接收指针事件。
+     否则转到对角线角度时，转子的透明角落会伸到星环外，
+     盖住上方模式切换控件与下方提示文字的可点击 / 可选区域。 */
+  pointer-events: none;
 }
 
 .orbit-slot {
@@ -143,6 +245,7 @@
   top: 0;
   transform: translate(-50%, -50%);
   width: var(--node);
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -423,6 +526,9 @@
   .orbit-hint {
     font-size: 10.5px;
   }
+  .wheel-mode__btn {
+    padding: 8px 16px;
+  }
 }
 
 @media (max-width: 400px) {
@@ -440,5 +546,8 @@
   .orbit-counter,
   .orbit-ring--outer {
     animation: none !important;
+  }
+  .wheel-in {
+    animation: none;
   }
 }

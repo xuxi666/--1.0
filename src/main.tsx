@@ -8,7 +8,9 @@ import './styles/layout.css'
 import './styles/orbit.css'
 import './styles/home.css'
 import './styles/pages.css'
+import './styles/dishbook.css'
 import './styles/community.css'
+import './styles/transition.css'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

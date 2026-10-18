@@ -1,0 +1,482 @@
+/* ============================================================
+   圆形揭示转场 + 菜系/口味专属主题页（--t-* 变量由 visualThemes.ts 注入）
+   ============================================================ */
+
+/* ------------------------------ 转场揭示层 ------------------------------ */
+
+.circular-transition {
+  position: fixed;
+  inset: 0;
+  /* 高于页面内容与悬浮精灵（200），低于站点导航（300）：
+     导航留在原位，圆形揭示只发生在页面区域，落地时不会有 chrome 跳动 */
+  z-index: 240;
+  overflow: hidden;
+  pointer-events: auto;
+  contain: strict;
+}
+
+/* 揭示圆（取景框）：用 transform: scale() 扩张。配合舞台的等量逆缩放，
+   页面在圆内始终 1:1 且不位移 —— 扩张只走合成器，不重绘页面内容，
+   主线程再忙（挂载目标页 / 切路由）圆边也不会掉帧、不会停顿。 */
+.circular-transition__reveal {
+  position: absolute;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  backface-visibility: hidden;
+  contain: layout paint;
+}
+
+/* 真实目标页舞台：视口大小，按点击点（内联 transform-origin）反向缩放。
+   与揭示圆使用同一条动画曲线，合成后恒为 1:1，圆形只是它的取景框。
+   只用于视觉：内容不接收指针事件（外层 .circular-transition 统一拦截点击） */
+.circular-transition__preview {
+  position: absolute;
+  overflow: hidden;
+  background: var(--bg);
+  pointer-events: none;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  /* 固定定位的装饰（.theme-page::after）以本层为包含块，不会溢出圆形揭示区 */
+  contain: layout paint;
+}
+
+/* 预览层里的目标页保持稳定：不做入场编排（圆形的扩张本身就是入场），
+   滚动渐入元素直接呈现——与落地页的最终画面逐像素一致 */
+.circular-transition__preview .theme-page::before,
+.circular-transition__preview .theme-page::after,
+.circular-transition__preview .theme-page :is(
+  .page-back-row,
+  .cat-hero__visual,
+  .cat-hero__copy .eyebrow,
+  .page-title,
+  .page-sub,
+  .cat-hero__traits,
+  .cat-hero__persona,
+  .cat-hero__actions,
+  .cuisine-chat,
+  .cuisine-chat__head,
+  .cuisine-chat__scroll,
+  .chat-empty__greeting,
+  .chat-quickbar,
+  .chat-composer
+) {
+  animation: none;
+}
+
+.circular-transition__preview .reveal {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+/* 兜底：非聊天目标（如首页中央「开始探索」）用主题渐变圆形覆盖 */
+.circular-transition__reveal--color {
+  will-change: transform, opacity;
+}
+
+/* 主题柔光：中心亮、边缘化开，避免大面积纯色显得平 */
+.circular-transition__reveal--color::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, var(--t-glow, rgba(255, 255, 255, 0.2)) 0%, transparent 62%);
+  pointer-events: none;
+}
+
+/* 转场进行中：首页转盘轻微减权（只改透明度与缩放，不动布局） */
+body.is-transitioning .hero__stage {
+  opacity: 0.5;
+  transform: scale(0.985);
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.is-transitioning .hero__stage {
+    transform: none;
+  }
+}
+
+/* ------------------------------ 聊天页返回行 ------------------------------ */
+
+.page-back-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.page-back-row .back-link {
+  margin-bottom: 0;
+}
+
+.back-link--home {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition:
+    color 0.24s var(--ease),
+    gap 0.24s var(--ease);
+}
+
+.back-link--home:hover {
+  color: var(--t-accent, var(--accent));
+  gap: 12px;
+}
+
+/* ------------------------------ 主题页基础 ------------------------------ */
+
+.theme-page {
+  position: relative;
+  background: var(--t-bg, var(--bg));
+  transition: background 0.45s var(--ease);
+}
+
+/* 顶部主题环境光：进入聊天页后马上能感到「到了另一个世界」 */
+.theme-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 460px;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(58% 100% at 50% 0%, var(--t-glow, transparent) 0%, transparent 72%);
+  opacity: 0.55;
+}
+
+.theme-page > .container {
+  position: relative;
+  z-index: 1;
+}
+
+/* ------------------------------ 主题页 · 首屏 ------------------------------ */
+
+.theme-page .eyebrow {
+  color: var(--t-accent, var(--accent));
+}
+
+.theme-page .back-link:hover {
+  color: var(--t-accent, var(--accent));
+}
+
+.theme-page .chip--accent {
+  border-color: var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-accent);
+}
+
+.theme-page .cat-hero__visual {
+  border-color: var(--t-border);
+  box-shadow: 0 34px 80px var(--t-shadow, rgba(0, 0, 0, 0.4));
+}
+
+.theme-page .cat-hero__actions .btn--primary {
+  --btn-bg: var(--t-btn-bg);
+  --btn-fg: var(--t-btn-text);
+  --btn-bd: transparent;
+  box-shadow: 0 14px 34px var(--t-shadow, rgba(0, 0, 0, 0.4));
+}
+
+/* 聊天输入区的发送按钮也跟随世界主题 */
+.theme-page .chat-composer .btn--primary {
+  --btn-bg: var(--t-btn-bg);
+  --btn-fg: var(--t-btn-text);
+  --btn-bd: transparent;
+}
+
+/* 快捷入口（视频检索）与「清空对话」的悬停也走主题色 */
+.theme-page .chat-quickbar__video:hover {
+  border-color: var(--t-border);
+  color: var(--t-accent);
+}
+
+.theme-page .chat-head__clear:hover:not(:disabled) {
+  border-color: var(--t-border);
+  color: var(--t-accent);
+}
+
+.theme-page .cat-hero__actions .btn--primary:hover {
+  filter: brightness(1.07);
+}
+
+.theme-page .cat-hero__actions .btn--ghost:hover,
+.theme-page .section .btn--ghost:hover {
+  --btn-bd: var(--t-border);
+  --btn-bg: var(--t-surface);
+}
+
+.theme-page .cat-switch__item:hover {
+  border-color: var(--t-border);
+  color: var(--t-accent);
+}
+
+.theme-page .cuisine-dish:hover {
+  border-color: var(--t-border);
+}
+
+.theme-page .link-arrow:hover {
+  color: var(--t-accent);
+}
+
+/* ------------------------------ 主题页 · 聊天区 ------------------------------ */
+
+.theme-page .cuisine-chat {
+  max-width: 1080px;
+  margin-inline: auto;
+  border-color: var(--t-border);
+  background: var(--t-chat-bg, var(--card));
+  box-shadow: 0 30px 80px var(--t-shadow, rgba(0, 0, 0, 0.35));
+}
+
+.theme-page .cuisine-chat__head {
+  border-bottom-color: var(--t-border);
+  background: rgba(245, 241, 235, 0.03);
+}
+
+.theme-page .cuisine-chat__titles .chat-head__sub {
+  color: var(--t-muted, var(--muted));
+}
+
+.theme-page .live-flag {
+  color: var(--t-accent);
+}
+
+.theme-page .chat-empty__greeting {
+  color: var(--t-text, var(--text));
+}
+
+.theme-page .chat-suggest {
+  border-color: var(--t-border);
+  color: var(--t-muted);
+}
+
+.theme-page .chat-suggest:hover {
+  color: var(--t-accent);
+  border-color: var(--t-accent);
+  background: var(--t-surface);
+}
+
+/* 消息气泡：助手 / 用户 / 报错 / 视频卡各自保持层次，先按主题上色，再还原特殊态 */
+.theme-page .msg__bubble {
+  background: var(--t-bubble-bg);
+  border-color: var(--t-bubble-border);
+  color: var(--t-bubble-text);
+}
+
+.theme-page .msg--user .msg__bubble {
+  background: var(--t-user-bg);
+  border-color: var(--t-bubble-border);
+  color: var(--t-user-text);
+}
+
+.theme-page .msg--error .msg__bubble {
+  background: rgba(198, 93, 59, 0.12);
+  border-color: rgba(198, 93, 59, 0.3);
+  color: #eda78d;
+}
+
+.theme-page .msg__bubble--video {
+  background: rgba(16, 16, 19, 0.88);
+  border-color: var(--t-border);
+}
+
+.theme-page .msg__caret {
+  background: var(--t-accent);
+}
+
+.theme-page .chat-composer {
+  border-top-color: var(--t-border);
+}
+
+.theme-page .chat-composer textarea:focus {
+  border-color: var(--t-primary);
+  box-shadow: 0 0 0 3px var(--t-surface);
+}
+
+/* ------------------------------ 转场落地页（无缝衔接） ------------------------------ */
+
+/* 由圆形揭示转场送进来的页面：预览层里已经展示过世界的最终画面，
+   落地页再播一次入场编排就会在「移除预览层」的瞬间露出未淡入的内容。
+   .no-enter 永久关闭该实例的入场编排（直接加载 / 刷新页面时照常播放）。 */
+.theme-page.no-enter::before,
+.theme-page.no-enter::after,
+.theme-page.no-enter :is(
+  .page-back-row,
+  .cat-hero__visual,
+  .cat-hero__copy .eyebrow,
+  .page-title,
+  .page-sub,
+  .cat-hero__traits,
+  .cat-hero__persona,
+  .cat-hero__actions,
+  .cuisine-chat,
+  .cuisine-chat__head,
+  .cuisine-chat__scroll,
+  .chat-empty__greeting,
+  .chat-quickbar,
+  .chat-composer
+) {
+  animation: none;
+}
+
+/* 落地后 900ms 内：滚动渐入元素直接呈现（避开切换瞬间的落差），随后恢复滚动动画 */
+.theme-page.no-enter.skip-reveal .reveal {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+/* 转场落地页的路由淡入同样跳过（预览层已经是最终画面） */
+.route-fade--skip {
+  animation: none;
+}
+
+/* ------------------------------ 进入世界的分层入场 ------------------------------ */
+
+/* 一次性编排：世界背景 → 世界名称 → 介绍 → AI 人格（头部）→ 欢迎语 / 消息区 → 输入框。
+   全部是一次性动画（1 次迭代），结束后不留任何循环动画干扰阅读。 */
+
+@keyframes world-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* 单关键帧：从 0 补间到元素自身的最终透明度（装饰 / 环境光用） */
+@keyframes world-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 世界环境光与轻量装饰先亮起来 */
+.theme-page::before {
+  animation: world-fade 520ms var(--ease-out) 60ms both;
+}
+
+/* 装饰层：两束角落柔光 + 一束小光，把「世界」的氛围留在视野里（静止、低强度） */
+.theme-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(44% 34% at 90% 10%, var(--t-glow, transparent) 0%, transparent 70%),
+    radial-gradient(52% 40% at 4% 84%, var(--t-glow, transparent) 0%, transparent 72%),
+    radial-gradient(26% 20% at 82% 90%, var(--t-orb, transparent) 0%, transparent 76%);
+  opacity: 0.16;
+  animation: world-fade 700ms var(--ease-out) 140ms both;
+}
+
+.theme-page .page-back-row {
+  animation: world-enter 300ms var(--ease-out) 100ms both;
+}
+
+.theme-page .cat-hero__visual {
+  animation: world-enter 380ms var(--ease-out) 140ms both;
+}
+
+.theme-page .cat-hero__copy .eyebrow {
+  animation: world-enter 300ms var(--ease-out) 170ms both;
+}
+
+/* 世界名称 */
+.theme-page .page-title {
+  animation: world-enter 340ms var(--ease-out) 200ms both;
+}
+
+/* 世界介绍 */
+.theme-page .page-sub {
+  animation: world-enter 340ms var(--ease-out) 240ms both;
+}
+
+.theme-page .cat-hero__traits {
+  animation: world-enter 300ms var(--ease-out) 280ms both;
+}
+
+.theme-page .cat-hero__persona {
+  animation: world-enter 300ms var(--ease-out) 310ms both;
+}
+
+.theme-page .cat-hero__actions {
+  animation: world-enter 300ms var(--ease-out) 340ms both;
+}
+
+/* 聊天世界：外壳 → AI 名称与人格标签 → 欢迎语 / 消息区 → 输入框与发送按钮 */
+.theme-page .cuisine-chat {
+  animation: world-fade 380ms var(--ease-out) 300ms both;
+}
+
+.theme-page .cuisine-chat__head {
+  animation: world-enter 300ms var(--ease-out) 340ms both;
+}
+
+.theme-page .cuisine-chat__scroll,
+.theme-page .chat-empty__greeting {
+  animation: world-enter 320ms var(--ease-out) 380ms both;
+}
+
+.theme-page .chat-quickbar,
+.theme-page .chat-composer {
+  animation: world-enter 300ms var(--ease-out) 420ms both;
+}
+
+/* AI 头像的主题光效（静态柔光，不做循环呼吸，避免干扰阅读） */
+.theme-page .chat-head__avatar,
+.theme-page .chat-empty__avatar,
+.theme-page .msg__avatar {
+  border: 1px solid var(--t-border, var(--line));
+  box-shadow:
+    0 0 18px var(--t-glow, transparent),
+    0 0 46px var(--t-glow, transparent);
+}
+
+.theme-page .chat-empty__avatar {
+  border-width: 1px;
+}
+
+/* ------------------------------ 减少动态效果 ------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .circular-transition__reveal--color {
+    will-change: opacity;
+  }
+
+  /* 入场编排全部关闭：内容立即可见，不做延迟等待 */
+  .theme-page::before,
+  .theme-page::after,
+  .theme-page .page-back-row,
+  .theme-page .cat-hero__visual,
+  .theme-page .cat-hero__copy .eyebrow,
+  .theme-page .page-title,
+  .theme-page .page-sub,
+  .theme-page .cat-hero__traits,
+  .theme-page .cat-hero__persona,
+  .theme-page .cat-hero__actions,
+  .theme-page .cuisine-chat,
+  .theme-page .cuisine-chat__head,
+  .theme-page .cuisine-chat__scroll,
+  .theme-page .chat-empty__greeting,
+  .theme-page .chat-quickbar,
+  .theme-page .chat-composer {
+    animation: none;
+  }
+}

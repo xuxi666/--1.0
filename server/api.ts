@@ -4,10 +4,12 @@
  * 作为 Vite 中间件运行，同时服务 dev 与 preview：
  *   GET  /api/status          -> AI 是否已接入
  *   POST /api/chat            -> 角色多轮对话（SSE 流式）
+ *   POST /api/taste-chat      -> 口味探索人格对话（SSE 流式，按 tasteId 从 tastes.ts 选择提示词）
  *   POST /api/pet-chat        -> 首页美食小精灵：通用助手（SSE 流式，无角色人格）
  *   POST /api/recipe          -> 结构化菜谱（服务端解析 + 校验）
  *   POST /api/recommend       -> 先筛库、再打分、最后让 AI 写推荐理由
  *   POST /api/related-dishes  -> 聊天页「相关菜品」（AI 从菜品库挑选 + 写理由）
+ *   POST /api/videos/search   -> 做菜视频搜索（B 站真实检索 + 各平台官方搜索入口）
  *   GET  /api/community       -> 社区快照（用户帖子 + 回复表 + 点赞表）
  *   POST /api/community/posts   -> 发帖（存 data/community.json，局域网内同步）
  *   POST /api/community/replies -> 回复
@@ -20,7 +22,9 @@
 import fs from 'node:fs'
 import nodePath from 'node:path'
 import { characterMap } from '../src/data/characters'
-import { dishDatabase, type Dish } from '../src/data/dishes'
+import { foodTypeTags, getCuisine, isCuisineId } from '../src/data/cuisines'
+import { getTaste, tasteIncludesDish } from '../src/data/tastes'
+import { dishChatCharacterId, dishDatabase, dishMap, type Dish } from '../src/data/dishes'
 import {
   avatarColorFor,
   communityPosts,
@@ -30,6 +34,7 @@ import {
   type PostReply,
 } from '../src/data/community'
 import type { Recipe, RecipeIngredient, RecipeStep } from '../src/types'
+import { VideoSearchInputError, searchVideos, videoSearchConfig } from './services/videoSearch'
 
 type Env = Record<string, string | undefined>
 type Req = any
@@ -178,6 +183,32 @@ function extractJson(text: string): unknown {
 /* --------------------------- 智谱 AI 调用 --------------------------- */
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+
+/**
+ * 菜品上下文块（菜品图鉴详情页 → 聊天）。
+ * ------------------------------------------------------------
+ * 用户从某道菜的图鉴详情页点进聊天时，前端会带上 dishId；
+ * 服务端先用菜品库校验（角色聊天要求这道菜属于该角色，菜系聊天要求属于该菜系），
+ * 校验通过才把这道菜的真实数据（名称、地域、口味、食材、技法、难度）写进系统提示词，
+ * 防止前端伪造上下文，也避免把无关的菜硬塞进对话。
+ */
+function buildDishContext(dish: Dish): string {
+  const cuisineName = dish.cuisineId ? getCuisine(dish.cuisineId)?.name : undefined
+  const foodTypeName = dish.foodTypeId ? foodTypeTags.find((tag) => tag.id === dish.foodTypeId)?.name : undefined
+  const owner = [cuisineName && `${cuisineName}菜`, foodTypeName && `${foodTypeName}（独立美食类型）`]
+    .filter(Boolean)
+    .join(' / ')
+  return [
+    `【当前讨论的菜品】用户正在看菜品图鉴里的「${dish.name}」，并带着这道菜进入了聊天。`,
+    `—— 归属：${owner || '家常菜'}；地域：${dish.region}`,
+    `—— 一句话：${dish.summary}`,
+    `—— 简介：${dish.description}`,
+    `—— 主要食材：${dish.ingredients.join('、')}`,
+    `—— 口味：${dish.flavors.join('、')}；家庭技法：${dish.cookingMethods.join('、')}`,
+    `—— 家常难度：${dish.difficulty}；参考时间约 ${dish.minutes} 分钟；人均参考 ¥${dish.price}`,
+    `围绕这道菜回答用户的问题；需要延伸时再自然展开，不要换成与它无关的内容。菜品来历没有把握就说不确定，不编造。`,
+  ].join('\n')
+}
 
 function zhipuConfig(env: Env) {
   const apiKey = env.ZHIPU_API_KEY?.trim()
@@ -521,6 +552,8 @@ type RecommendInput = {
   people?: number
   minutes?: number
   region?: string
+  /** 限定菜系（八大菜系 id）；为空字符串表示不限 */
+  cuisine?: string
   avoid?: string[]
 }
 
@@ -530,6 +563,7 @@ export function selectCandidates(input: RecommendInput): Dish[] {
   const minutes = toNumber(input.minutes, 60, 5, 600)
   const people = toNumber(input.people, 2, 1, 12)
   const region = toText(input.region, 20)
+  const cuisine = toText(input.cuisine, 20)
   const avoid = (input.avoid ?? []).map((a) => a.trim()).filter(Boolean)
   const flavors = (input.flavors ?? []).map((f) => f.trim()).filter(Boolean)
   const scene = MOOD_SCENE[toText(input.mood, 12)] ?? ''
@@ -541,6 +575,8 @@ export function selectCandidates(input: RecommendInput): Dish[] {
     .filter((d) => (avoid.length ? !d.allergens.some((a) => avoid.includes(a)) : true))
     .filter((d) => (avoid.length ? !avoid.some((a) => d.ingredients.some((i) => i.includes(a))) : true))
     .filter((d) => (region && region !== '不限' ? d.region === region || d.region === '全国' : true))
+    // 用户限定菜系时严格筛选，只推荐明确归属该菜系的菜
+    .filter((d) => (cuisine ? d.cuisineId === cuisine : true))
     .map((d) => {
       let score = 0
       const matched: string[] = []
@@ -575,7 +611,8 @@ export function selectCandidates(input: RecommendInput): Dish[] {
   const pool = flavors.length && flavorMatched.length >= 3 ? flavorMatched : scored
 
   const picked = pool.slice(0, Math.min(4, Math.max(3, pool.length)))
-  if (picked.length < 3) {
+  // 限定了菜系时不跨界补足：宁可少于 3 道甚至为空，也不推荐其他菜系的菜
+  if (picked.length < 3 && !cuisine) {
     // 条件过严时补足，但绝不编造菜品
     const rest = dishDatabase.filter((d) => !picked.some((p) => p.dish.id === d.id))
     while (picked.length < 3 && rest.length) {
@@ -673,6 +710,10 @@ export function createApiMiddleware(env: Env) {
         const character = characterMap[toText(body.characterId, 40)]
         if (!character) return sendJson(res, 400, { error: 'unknown character' })
 
+        // 可选的菜品上下文：只有这道菜确实属于该角色时才注入；无效或不属于该角色就当作普通角色聊天
+        const contextDish = dishMap[toText(body.dishId, 60)]
+        const dishContext = contextDish && dishChatCharacterId(contextDish) === character.id ? contextDish : undefined
+
         const history: ChatMessage[] = (Array.isArray(body.messages) ? body.messages : [])
           .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant'))
           .map((m: any) => ({
@@ -700,6 +741,9 @@ export function createApiMiddleware(env: Env) {
             '',
             `我是${character.name}。${character.quote}`,
             '',
+            ...(dishContext
+              ? [`你从图鉴页点了「${dishContext.name}」进来，这道菜我熟：${dishContext.summary}`, '']
+              : []),
             `你问的是「${lastUser.slice(0, 60)}」。`,
             `按我的性子，我会先告诉你：${character.examples[0]}`,
             `我能聊的范围是：${character.knowledge.slice(0, 3).join('、')}。`,
@@ -717,7 +761,180 @@ export function createApiMiddleware(env: Env) {
         try {
           await streamZhipu(
             env,
-            [{ role: 'system', content: character.systemPrompt }, ...history],
+            [
+              { role: 'system', content: character.systemPrompt },
+              ...(dishContext ? [{ role: 'system' as const, content: buildDishContext(dishContext) }] : []),
+              ...history,
+            ],
+            (text) => write({ type: 'delta', text }),
+          )
+          write({ type: 'done', demo: false })
+          res.end()
+        } catch (error: any) {
+          const message = String(error?.message ?? error)
+          write({
+            type: 'error',
+            message: message.includes('429')
+              ? '请求太频繁了，缓一分钟再来找我。'
+              : message.includes('abort')
+                ? '这次回答超时了，要不要再问一次？'
+                : '我这会儿没接上话，请稍后再试。',
+          })
+          res.end()
+        }
+        return
+      }
+
+      /* ---------------- 菜系专属对话（八大菜系人格，提示词由服务端按 cuisineId 选择） ---------------- */
+      if (path === '/api/cuisine-chat' && req.method === 'POST') {
+        const body = await readBody(req)
+        // cuisineId 只认八大菜系白名单：未知 id 返回明确的客户端错误，绝不静默回退成某个角色
+        const cuisine = getCuisine(toText(body.cuisineId, 40))
+        if (!cuisine) return sendJson(res, 400, { error: 'unknown cuisine' })
+
+        // 可选的菜品上下文：只有这道菜属于该菜系时才注入（火锅等独立类型菜同样按所属菜系判断）
+        const contextDish = dishMap[toText(body.dishId, 60)]
+        const dishContext = contextDish && contextDish.cuisineId === cuisine.id ? contextDish : undefined
+
+        // 只接受 user / assistant 两种角色；system 一律由服务端按 cuisineId 注入，前端传入会被过滤
+        const history: ChatMessage[] = (Array.isArray(body.messages) ? body.messages : [])
+          .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant'))
+          .map((m: any) => ({
+            role: m.role as 'user' | 'assistant',
+            content: toText(m.content, 2000),
+          }))
+          .filter((m: ChatMessage) => m.content)
+          .slice(-12)
+
+        if (!history.length) return sendJson(res, 400, { error: 'empty messages' })
+
+        res.statusCode = 200
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+        res.setHeader('Cache-Control', 'no-cache, no-transform')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('X-Accel-Buffering', 'no')
+
+        const write = (payload: unknown) => res.write(`data: ${JSON.stringify(payload)}\n\n`)
+
+        if (!enabled) {
+          // 演示模式：用该菜系配置生成文本，并明确标注不是真实模型
+          const lastUser = [...history].reverse().find((m) => m.role === 'user')?.content ?? ''
+          const demo = [
+            `${DEMO_NOTICE}`,
+            '',
+            cuisine.greeting,
+            '',
+            `我是「${cuisine.name}」的 AI 人格（${cuisine.personalityTag}），代表整个${cuisine.name}菜系。`,
+            ...(dishContext
+              ? [`你从图鉴页点了「${dishContext.name}」进来，这道菜在我们这儿是这样：${dishContext.summary}`, '']
+              : []),
+            `你问的是「${lastUser.slice(0, 60)}」。`,
+            `按我的路子，先介绍招牌：${cuisine.representativeDishes.slice(0, 3).map((dish) => dish.name).join('、')}。`,
+            `我能聊的范围是：${cuisine.knowledge.slice(0, 3).join('、')}。`,
+            '',
+            `在服务端配置 ZHIPU_API_KEY 之后，我会用完整的菜系人格与真实知识回答你，而不是这段固定文本。`,
+          ].join('\n')
+          for (const chunk of demo.match(/[\s\S]{1,12}/g) ?? []) {
+            write({ type: 'delta', text: chunk })
+            await new Promise((r) => setTimeout(r, 18))
+          }
+          write({ type: 'done', demo: true })
+          return res.end()
+        }
+
+        try {
+          await streamZhipu(
+            env,
+            [
+              { role: 'system', content: cuisine.systemPrompt },
+              ...(dishContext ? [{ role: 'system' as const, content: buildDishContext(dishContext) }] : []),
+              ...history,
+            ],
+            (text) => write({ type: 'delta', text }),
+          )
+          write({ type: 'done', demo: false })
+          res.end()
+        } catch (error: any) {
+          const message = String(error?.message ?? error)
+          write({
+            type: 'error',
+            message: message.includes('429')
+              ? '请求太频繁了，缓一分钟再来找我。'
+              : message.includes('abort')
+                ? '这次回答超时了，要不要再问一次？'
+                : '我这会儿没接上话，请稍后再试。',
+          })
+          res.end()
+        }
+        return
+      }
+
+      /* ---------------- 口味探索对话（八种口味人格，提示词由服务端按 tasteId 选择） ---------------- */
+      if (path === '/api/taste-chat' && req.method === 'POST') {
+        const body = await readBody(req)
+        // tasteId 只认八种口味白名单：未知 id 返回明确的客户端错误。
+        // taste 与 cuisine / character 是彼此独立的三套上下文，绝不互相回退。
+        const taste = getTaste(toText(body.tasteId, 40))
+        if (!taste) return sendJson(res, 400, { error: 'unknown taste' })
+
+        // 可选的菜品上下文：只有这道菜确实是该口味的代表菜时才注入
+        const contextDish = dishMap[toText(body.dishId, 60)]
+        const dishContext = tasteIncludesDish(taste, contextDish?.id) ? contextDish : undefined
+
+        // 只接受 user / assistant 两种角色；system 一律由服务端按 tasteId 注入，前端传入会被过滤
+        const history: ChatMessage[] = (Array.isArray(body.messages) ? body.messages : [])
+          .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant'))
+          .map((m: any) => ({
+            role: m.role as 'user' | 'assistant',
+            content: toText(m.content, 2000),
+          }))
+          .filter((m: ChatMessage) => m.content)
+          .slice(-12)
+
+        if (!history.length) return sendJson(res, 400, { error: 'empty messages' })
+
+        res.statusCode = 200
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+        res.setHeader('Cache-Control', 'no-cache, no-transform')
+        res.setHeader('Connection', 'keep-alive')
+        res.setHeader('X-Accel-Buffering', 'no')
+
+        const write = (payload: unknown) => res.write(`data: ${JSON.stringify(payload)}\n\n`)
+
+        if (!enabled) {
+          // 演示模式：用该口味配置生成文本，并明确标注不是真实模型
+          const lastUser = [...history].reverse().find((m) => m.role === 'user')?.content ?? ''
+          const demo = [
+            `${DEMO_NOTICE}`,
+            '',
+            taste.greeting,
+            '',
+            `我是「${taste.name}」口味方向的 AI 人格（${taste.personalityTag}）——不是菜系，也不代表某一道菜。`,
+            ...(dishContext
+              ? [`你从口味页点了「${dishContext.name}」进来，它属于这个口味方向：${dishContext.summary}`, '']
+              : []),
+            `你问的是「${lastUser.slice(0, 60)}」。`,
+            `按我的路子，先介绍代表菜：${taste.representativeDishes.slice(0, 3).map((dish) => dish.name).join('、')}。`,
+            `我能聊的范围是：${taste.knowledge.slice(0, 3).join('、')}。`,
+            '',
+            `在服务端配置 ZHIPU_API_KEY 之后，我会用完整的口味人格与真实知识回答你，而不是这段固定文本。`,
+          ].join('\n')
+          for (const chunk of demo.match(/[\s\S]{1,12}/g) ?? []) {
+            write({ type: 'delta', text: chunk })
+            await new Promise((r) => setTimeout(r, 18))
+          }
+          write({ type: 'done', demo: true })
+          return res.end()
+        }
+
+        try {
+          await streamZhipu(
+            env,
+            [
+              { role: 'system', content: taste.systemPrompt },
+              ...(dishContext ? [{ role: 'system' as const, content: buildDishContext(dishContext) }] : []),
+              ...history,
+            ],
             (text) => write({ type: 'delta', text }),
           )
           write({ type: 'done', demo: false })
@@ -884,6 +1101,10 @@ export function createApiMiddleware(env: Env) {
       /* ---------------- 个性化推荐 ---------------- */
       if (path === '/api/recommend' && req.method === 'POST') {
         const body = await readBody(req)
+        // 限定菜系：只接受八大菜系白名单 id 或空字符串，其他值明确报错
+        const cuisine = toText(body.cuisine, 20)
+        if (cuisine && !isCuisineId(cuisine)) return sendJson(res, 400, { error: 'unknown cuisine' })
+
         const input: RecommendInput = {
           mood: toText(body.mood, 20),
           flavors: Array.isArray(body.flavors) ? body.flavors.slice(0, 5).map((f: any) => toText(f, 12)) : [],
@@ -892,10 +1113,15 @@ export function createApiMiddleware(env: Env) {
           people: toNumber(body.people, 2, 1, 12),
           minutes: toNumber(body.minutes, 60, 5, 600),
           region: toText(body.region, 20),
+          cuisine,
           avoid: Array.isArray(body.avoid) ? body.avoid.slice(0, 8).map((a: any) => toText(a, 12)) : [],
         }
 
         const candidates = selectCandidates(input)
+        if (!candidates.length) {
+          // 限定了菜系但菜品库暂无可选菜：诚实返回空结果，不用其他菜系的菜补位
+          return sendJson(res, 200, { demo: false, model, results: [] })
+        }
         if (!enabled) {
           return sendJson(res, 200, {
             demo: true,
@@ -911,7 +1137,7 @@ export function createApiMiddleware(env: Env) {
         const prompt = [
           `用户画像：心情=${input.mood || '未说明'}；口味=${(input.flavors ?? []).join('、') || '不限'}；`,
           `辣度上限=${input.spicy}/3；预算人均=${input.budget} 元；人数=${input.people}；`,
-          `可接受时长=${input.minutes} 分钟；地域=${input.region || '不限'}；忌口=${(input.avoid ?? []).join('、') || '无'}。`,
+          `可接受时长=${input.minutes} 分钟；地域=${input.region || '不限'}；菜系限定=${input.cuisine ? getCuisine(input.cuisine)?.name ?? input.cuisine : '不限'}；忌口=${(input.avoid ?? []).join('、') || '无'}。`,
           ``,
           `只能从下列候选中挑选，禁止新增菜品：`,
           ...candidates.map(
@@ -1047,6 +1273,31 @@ export function createApiMiddleware(env: Env) {
             error: String(error?.message ?? error).slice(0, 160),
             items: fallback.map((dish) => withMeta(dish, demoReason(dish, {}), '同口味')),
           })
+        }
+      }
+
+      /* ---------------- 做菜视频搜索（B 站真实检索 + 平台搜索入口） ---------------- */
+      if (path === '/api/videos/search' && req.method === 'POST') {
+        const body = await readBody(req)
+        try {
+          const bundle = await searchVideos(
+            {
+              text: toText(body.text, 300),
+              dish: body.dish === undefined ? undefined : toText(body.dish, 40),
+              query: body.query === undefined ? undefined : toText(body.query, 100),
+              platforms: Array.isArray(body.platforms) ? body.platforms : undefined,
+              difficulty: body.difficulty === undefined ? undefined : toText(body.difficulty, 10),
+              maxDuration: body.maxDuration === undefined ? undefined : toNumber(body.maxDuration, 0, 0, 999),
+              limit: body.limit === undefined ? undefined : toNumber(body.limit, 6, 1, 99),
+              contextCharacterId: toText(body.contextCharacterId, 40) || undefined,
+              contextCuisineId: toText(body.contextCuisineId, 40) || undefined,
+            },
+            { config: videoSearchConfig(env) },
+          )
+          return sendJson(res, 200, bundle)
+        } catch (error) {
+          if (error instanceof VideoSearchInputError) return sendJson(res, 400, { error: error.message })
+          throw error
         }
       }
 

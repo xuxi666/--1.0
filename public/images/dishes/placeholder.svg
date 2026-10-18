@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="菜品图片待补充">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14141a" />
+      <stop offset="1" stop-color="#1d1a17" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)" />
+  <rect x="26" y="26" width="748" height="548" rx="26" fill="none" stroke="#e8a766" stroke-opacity="0.38"
+    stroke-width="2" stroke-dasharray="12 10" />
+  <g fill="none" stroke="#e8a766" stroke-opacity="0.75" stroke-width="6" stroke-linecap="round">
+    <path d="M270 300h260a10 10 0 0 1 10 12c-8 52-58 88-140 88s-132-36-140-88a10 10 0 0 1 10-12z" />
+    <path d="M400 400v34" />
+    <path d="M352 448h96" />
+    <path d="M336 268c0-22 18-24 18-44" />
+    <path d="M392 268c0-22 18-24 18-44" />
+    <path d="M448 268c0-22 18-24 18-44" />
+  </g>
+  <text x="400" y="516" text-anchor="middle" fill="#f5f1eb" font-size="30"
+    font-family="'PingFang SC','Microsoft YaHei',sans-serif">图片待补充</text>
+  <text x="400" y="556" text-anchor="middle" fill="#a6a19a" font-size="20"
+    font-family="'PingFang SC','Microsoft YaHei',sans-serif">未找到可靠图片，不使用来源不明的网络图</text>
+</svg>

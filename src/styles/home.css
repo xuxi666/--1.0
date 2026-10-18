@@ -95,34 +95,6 @@
   margin-top: 4px;
 }
 
-.hero__facts {
-  display: flex;
-  gap: 26px;
-  margin-top: 14px;
-  padding-top: 22px;
-  border-top: 1px solid rgba(23, 19, 15, 0.1);
-  width: 100%;
-  max-width: 420px;
-}
-
-.hero__facts li {
-  display: grid;
-  gap: 2px;
-}
-
-.hero__facts strong {
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.hero__facts span {
-  font-size: 11.5px;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted);
-}
-
 .hero__orbit {
   display: flex;
   justify-content: center;
@@ -144,22 +116,12 @@
   .hero__actions {
     justify-content: center;
   }
-  .hero__facts {
-    justify-content: center;
-    max-width: none;
-  }
   .hero {
     padding-top: calc(var(--nav-h) + 36px);
   }
 }
 
 @media (max-width: 560px) {
-  .hero__facts {
-    gap: 18px;
-  }
-  .hero__facts strong {
-    font-size: 19px;
-  }
   .hero__actions .btn {
     width: 100%;
   }
@@ -1317,6 +1279,140 @@
     padding: 80px 0 90px;
   }
   .cta__actions .btn {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   ȫ��������ҳ��/ = HomeScreen����̽��ҳ��/explore��
+   ============================================================ */
+
+.home-screen {
+  background: var(--cream);
+}
+
+/* ��ҳ������������ռ��һ����������¶���κκ���ģ�� */
+.hero--full {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: calc(var(--nav-h) + 10px) 16px 14px;
+}
+
+.hero__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  padding: 4px 0;
+}
+
+.hero__explore {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 8px 2px 2px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #8a7f72;
+  transition:
+    color 0.24s var(--ease),
+    gap 0.24s var(--ease);
+}
+
+.hero__explore:hover {
+  color: #c65d3b;
+  gap: 11px;
+}
+
+/* 手机上换成短文案（见下方媒体查询） */
+.hero__explore-short {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .hero__explore {
+    font-size: 11px;
+  }
+  /* 手机上收短文案，避免和右下角悬浮小精灵（气泡 / 形象）抢位置 */
+  .hero__explore-long {
+    display: none;
+  }
+  .hero__explore-short {
+    display: inline;
+  }
+}
+
+/* ���������ڣ�����̽������У����ȱ�֤ת������ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .hero--full {
+    padding-top: calc(var(--nav-h) + 2px);
+    padding-bottom: 8px;
+  }
+  .hero__explore {
+    display: none;
+  }
+  .hero__stage {
+    padding: 0;
+  }
+}
+
+/* ------------------------------ ̽��ҳ���� ------------------------------ */
+
+.explore {
+  background: var(--cream);
+}
+
+.explore-hero {
+  background: var(--cream);
+  color: var(--ink);
+  padding: calc(var(--nav-h) + 64px) 0 76px;
+}
+
+.explore-hero__inner {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  text-align: center;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.explore-hero__title {
+  font-size: clamp(30px, 4.6vw, 58px);
+  line-height: 1.14;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+}
+
+.explore-hero__sub {
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink-muted);
+  max-width: 560px;
+}
+
+.explore-hero__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .explore-hero {
+    padding-bottom: 60px;
+  }
+  .explore-hero__actions {
+    width: 100%;
+  }
+  .explore-hero__actions .btn {
     width: 100%;
   }
 }

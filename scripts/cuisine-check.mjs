@@ -1,14 +1,17 @@
 /**
- * 八大菜系首页重构自检：
+ * 八大菜系全链路自检：
  * 1. 首页星环 = 川粤苏鲁湘闽浙徽 8 个菜系节点，名称唯一、图片各不相同且真实加载
- * 2. 中心圆盘：品牌文案 + 「探索美食」→ /personalities#cuisines；悬停节点预览菜系
+ * 2. 中心圆盘：品牌文案 + 「探索美食」→ /personalities#cuisines；悬停节点预览菜系（含「和X AI 聊聊天」入口）
  * 3. 点击节点 → /cuisines/:id；菜系页含名称/人格标签/地域/介绍/4 道代表菜/角色入口
  * 3b. 32 道代表菜全部有真实图片（无 emoji 占位），且图片可访问
- * 4. 无角色的菜系（鲁/湘/闽/徽）显示诚实的空状态，不伪造角色
+ * 3c. 菜系聊天区：身份与菜系一致、真实流式回复、按菜系隔离存储、刷新后保留、主按钮锚点滚动
+ * 3d. 口味分类代言角色：主图与主按钮同源（防「浓香派却和烧烤聊天」类错配）
+ * 4. 无独立角色的菜系（鲁/湘/闽/徽）显示诚实的空状态，不伪造角色
  * 5. /personalities：八大菜系区块 + 更多美食类型标签 + 原有八种口味方向 + 17 位角色
  * 6. 键盘：聚焦节点后 Enter 进入菜系页
  * 7. 移动端 / 平板：无横向溢出，交互可用；reduced-motion 下星环静止
- * 8. 原有功能冒烟：聊天页 / 菜谱页 / 口味分类页 / 推荐页不报错
+ * 8. 原有功能冒烟：聊天页（含菜系标注）/ 菜谱页 / 口味分类页 / 推荐页不报错
+ * 9. 推荐页菜系限定：?cuisine=chuan 与 ?cuisine=lu 结果全部为对应菜系（图鉴补齐后鲁菜有真实候选）
  * 用法：先启动 dev server，再 node scripts/cuisine-check.mjs
  */
 import { chromium } from 'playwright-core'
@@ -75,7 +78,11 @@ await page.locator('.orbit-node', { hasText: '浙菜' }).first().hover({ force: 
 await page.waitForTimeout(250)
 const previewText = await page.locator('.orbit-disc__inner').innerText()
 check('悬停节点时圆盘预览菜系（浙菜）', previewText.includes('浙菜') && previewText.includes('清雅聪慧派'))
-check('预览含进入探索按钮', (await page.locator('.orbit-disc__cta').innerText()).includes('探索'))
+check(
+  '悬停预览含「和浙菜 AI 聊聊天」入口',
+  (await page.locator('.orbit-disc__cta').innerText()).includes('和浙菜 AI 聊聊天') &&
+    (await page.locator('.orbit-disc__cta').getAttribute('href')) === '/cuisines/zhe',
+)
 await page.mouse.move(10, 10)
 await page.waitForTimeout(200)
 check('移出星环后恢复品牌文案', (await page.locator('.orbit-disc__inner').innerText()).includes('八大菜系，万种风味'))
@@ -142,10 +149,80 @@ await page2.screenshot({ path: 'shots/cuisine-chuan.png', fullPage: true })
 
 await page2.goto(`${BASE}/cuisines/lu`, { waitUntil: 'networkidle' })
 const luText = await page2.locator('main').innerText()
-check('鲁菜页无角色时显示诚实空状态', luText.includes('专属角色还在酝酿') && (await page2.locator('.char-card').count()) === 0)
+check('鲁菜页无独立角色时显示诚实空状态', luText.includes('独立角色还在酝酿') && (await page2.locator('.char-card').count()) === 0)
 check('鲁菜页仍提供人格宇宙入口', (await page2.locator('a[href="/personalities"]').count()) > 0)
 await page2.goto(`${BASE}/cuisines/zhe`, { waitUntil: 'networkidle' })
 check('浙菜页关联到东坡肉角色', (await page2.locator('.char-card').count()) === 1)
+
+/* ---------- 3c. 菜系聊天区：身份一致、真实回复、隔离与持久化 ---------- */
+await page2.goto(`${BASE}/cuisines/chuan`, { waitUntil: 'networkidle' })
+check('川菜页含菜系聊天区', (await page2.locator('.cuisine-chat').count()) === 1)
+const chatHead = await page2.locator('.cuisine-chat__head').innerText()
+check(
+  '聊天区身份与川菜人格一致（川菜 · 热烈直球派 · 代表整个菜系）',
+  chatHead.includes('川菜') && chatHead.includes('热烈直球派') && chatHead.includes('代表整个川菜菜系'),
+)
+const greeting = await page2.locator('.cuisine-chat .chat-empty__greeting').innerText()
+check('聊天欢迎语非空', greeting.length > 20)
+check('聊天区提供 >= 3 条推荐问题', (await page2.locator('.cuisine-chat .chat-suggest').count()) >= 3)
+const chatPlaceholder = await page2.locator('.cuisine-chat textarea').getAttribute('placeholder')
+check('输入框占位提示当前菜系', chatPlaceholder.includes('川菜'))
+
+/* 主按钮锚点：滚动到本页聊天区 */
+await page2.locator('.cat-hero__actions a', { hasText: '聊聊天' }).click()
+await page2.waitForTimeout(900)
+const chatBox = await page2.locator('.cuisine-chat').boundingBox()
+check(
+  '「和川菜 AI 聊聊天」滚动到聊天区',
+  page2.url().includes('#cuisine-chat') && chatBox !== null && chatBox.y < 500,
+)
+
+/* 真实发送一条消息（服务端为 live 模式时走 GLM 流式） */
+await page2.locator('.cuisine-chat textarea').fill('你好，简单介绍一下你自己')
+await page2.locator('.cuisine-chat .chat-composer button[type="submit"]').click()
+await page2.waitForFunction(
+  () => {
+    const bubble = document.querySelector('.cuisine-chat .msg--assistant .msg__bubble')
+    return Boolean(bubble && (bubble.textContent ?? '').trim().length > 10)
+  },
+  { timeout: 90000 },
+)
+await page2.waitForFunction(() => !document.querySelector('.cuisine-chat .is-typing'), { timeout: 90000 })
+const replyText = await page2.locator('.cuisine-chat .msg--assistant .msg__bubble').last().innerText()
+check('菜系聊天收到流式回复且带川味', /川|麻|辣/.test(replyText))
+const storedChuan = await page2.evaluate(() => localStorage.getItem('fs-cuisine-chat-chuan'))
+check('对话写入川菜独立存储（fs-cuisine-chat-chuan）', Boolean(storedChuan && storedChuan.includes('你好')))
+await page2.reload({ waitUntil: 'networkidle' })
+check('刷新后对话仍在（本地持久化）', (await page2.locator('.cuisine-chat .msg').count()) >= 2)
+await page2.goto(`${BASE}/cuisines/yue`, { waitUntil: 'networkidle' })
+check('粤菜聊天区为空（不串川菜上下文）', (await page2.locator('.cuisine-chat .chat-empty').count()) === 1)
+const storedYue = await page2.evaluate(() => localStorage.getItem('fs-cuisine-chat-yue'))
+check('粤菜尚未产生会话记录', !storedYue || storedYue === '[]')
+check('粤菜聊天区身份为清鲜讲究派', (await page2.locator('.cuisine-chat__head').innerText()).includes('清鲜讲究派'))
+
+/* ---------- 3d. 口味分类代言角色：主图与主按钮同源 ---------- */
+const FEATURED = [
+  ['mala', 'mapo'],
+  ['xianxiang', 'xiaolongbao'],
+  ['nongxiang', 'dongpo'],
+  ['qingshuang', 'jiangnan'],
+  ['suanxiang', 'suancaiyu'],
+  ['tianrun', 'tangyuan'],
+  ['fajiao', 'choudoufu'],
+  ['jiachang', 'lanzhou'],
+]
+for (const [catId, charId] of FEATURED) {
+  await page2.goto(`${BASE}/personalities/${catId}`, { waitUntil: 'networkidle' })
+  const btnHref = await page2.locator('.cat-hero__actions a.btn--primary').getAttribute('href')
+  const imgAlt = await page2.locator('.cat-hero__visual img').getAttribute('alt')
+  check(`分类 ${catId}：主按钮指向代言角色 /chat/${charId}`, btnHref === `/chat/${charId}`)
+  check(`分类 ${catId}：主图标注代言角色`, imgAlt.includes('代言角色：'))
+}
+await page2.goto(`${BASE}/personalities/nongxiang`, { waitUntil: 'networkidle' })
+const nxAlt = await page2.locator('.cat-hero__visual img').getAttribute('alt')
+const nxBtn = await page2.locator('.cat-hero__actions a.btn--primary').innerText()
+check('浓香派：主图是东坡肉', nxAlt.includes('东坡肉'))
+check('浓香派：主按钮是东坡肉而非烧烤', nxBtn.includes('和东坡肉聊聊') && !nxBtn.includes('烧烤'))
 
 /* ---------- 4. 不存在的菜系 → 404 卡片 ---------- */
 await page2.goto(`${BASE}/cuisines/unknown`, { waitUntil: 'networkidle' })
@@ -169,11 +246,11 @@ check(
 check('原有八种口味方向保留', (await page3.locator('.cat-tile').count()) === 16)
 check('原有 17 位角色保留', (await page3.locator('.char-card').count()) === 17)
 
-/* 探索美食按钮真实可用 */
+/* 探索美食按钮真实可用（圆形扩散转场后进入人格宇宙菜系区块） */
 await page3.goto(`${BASE}/`, { waitUntil: 'networkidle' })
 await page3.locator('.orbit-disc__cta').click()
 await page3.waitForURL('**/personalities#cuisines')
-await page3.waitForTimeout(700)
+await page3.waitForTimeout(1200)
 const cuisinesSection = await page3.locator('#cuisines').boundingBox()
 check(
   '「探索美食」→ 人格宇宙菜系区块（滚动到位）',
@@ -250,7 +327,52 @@ await page6.goto(`${BASE}/recommend`, { waitUntil: 'networkidle' })
 check('推荐页仍可打开', (await page6.locator('main').count()) === 1)
 await page6.goto(`${BASE}/characters/jiangnan`, { waitUntil: 'networkidle' })
 check('江南菜角色页仍可打开', (await page6.locator('h1').count()) >= 1)
+await page6.goto(`${BASE}/community`, { waitUntil: 'networkidle' })
+check('社区页仍可打开（信息流渲染）', (await page6.locator('.community').count()) === 1)
+
+/* 菜系与角色的关联标注（角色聊天页 / 角色页） */
+await page6.goto(`${BASE}/chat/mapo`, { waitUntil: 'networkidle' })
+const chipCount = await page6.locator('.chat-head__cuisine').count()
+const chipHref = chipCount ? await page6.locator('.chat-head__cuisine').getAttribute('href') : ''
+const chipText = chipCount ? await page6.locator('.chat-head__cuisine').innerText() : ''
+check('麻婆豆腐聊天页标注所属菜系（川菜）并可跳转', chipCount === 1 && chipHref === '/cuisines/chuan' && chipText.includes('川菜'))
+await page6.goto(`${BASE}/chat/lanzhou`, { waitUntil: 'networkidle' })
+check('独立美食类型角色不强行标注菜系', (await page6.locator('.chat-head__cuisine').count()) === 0)
+await page6.goto(`${BASE}/chat/suancaiyu`, { waitUntil: 'networkidle' })
+check('切换角色列表自动包含当前角色（酸菜鱼）', (await page6.locator('.chat-side a[href="/chat/suancaiyu"]').count()) >= 1)
+check('侧栏角色数量为数据动态值（17 位）', (await page6.locator('.chat-side__all').innerText()).includes('17'))
+await page6.goto(`${BASE}/characters/mapo`, { waitUntil: 'networkidle' })
+check('角色页显示所属菜系标签（麻婆豆腐 → 川菜）', (await page6.locator('.char-panel__links .chip--link').innerText()).includes('川菜'))
 await ctx6.close()
+
+/* ---------- 9. 推荐 · 菜系限定 ---------- */
+const ctx7 = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+const page7 = await ctx7.newPage()
+track(page7, 'recommend-cuisine')
+await page7.goto(`${BASE}/recommend?cuisine=chuan`, { waitUntil: 'networkidle' })
+const pressedCuisine = await page7
+  .locator('.recommend__group', { hasText: '限定菜系' })
+  .locator('button[aria-pressed="true"]')
+  .innerText()
+check('推荐页从 ?cuisine=chuan 预选川菜', pressedCuisine.trim() === '川菜')
+await page7.locator('.recommend__submit button[type="submit"]').click()
+await page7.locator('.dish-card').first().waitFor({ timeout: 120000 })
+const recCardCount = await page7.locator('.dish-card').count()
+const recCats = await page7.locator('.dish-card__cuisine').allTextContents()
+check(
+  '限定川菜的推荐结果全部是川菜',
+  recCardCount >= 1 && recCats.length === recCardCount && recCats.every((text) => text.trim() === '川菜'),
+)
+await page7.goto(`${BASE}/recommend?cuisine=lu`, { waitUntil: 'networkidle' })
+await page7.locator('.recommend__submit button[type="submit"]').click()
+await page7.locator('.dish-card').first().waitFor({ timeout: 120000 })
+const luCardCount = await page7.locator('.dish-card').count()
+const luCats = await page7.locator('.dish-card__cuisine').allTextContents()
+check(
+  '限定鲁菜的推荐结果全部是鲁菜',
+  luCardCount >= 1 && luCats.length === luCardCount && luCats.every((text) => text.trim() === '鲁菜'),
+)
+await ctx7.close()
 
 await browser.close()
 

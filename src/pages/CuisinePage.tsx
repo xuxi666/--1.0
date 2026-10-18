@@ -1,19 +1,34 @@
-import { Link, useParams } from 'react-router-dom'
+import type { CSSProperties } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import CharacterCard from '../components/CharacterCard'
+import CuisineChat from '../components/CuisineChat'
 import FoodPhoto from '../components/FoodPhoto'
 import FoodTypeTags from '../components/FoodTypeTags'
 import Reveal from '../components/Reveal'
+import { useCircularTransition } from '../components/CircularTransition'
 import { characterMap } from '../data/characters'
-import { cuisineMap, cuisines, relatedCharactersOfCuisine } from '../data/cuisines'
+import { cuisines, getCuisine, relatedCharactersOfCuisine } from '../data/cuisines'
+import { getVisualTheme, themeVars } from '../data/visualThemes'
 import { photoUrl } from '../lib/photos'
+import { useWorldArrivalClass } from '../lib/worldArrival'
 
 /**
- * 菜系探索页：菜系名称、地域、文化介绍、代表菜、相关 AI 角色与聊天入口。
- * 复用现有角色页 / 聊天页 / 菜谱页的路由，不新建聊天系统。
+ * 菜系专属页（/cuisines/:id）＝ 菜系身份 + 菜系 AI 聊天 + 代表菜。
+ * ------------------------------------------------------------
+ * 首页转盘点击任意菜系后，圆形扩散转场把用户送进这里：
+ * - 标题、人格标签、地域、介绍、代表菜与聊天欢迎语全部来自同一份 cuisine 配置；
+ * - 页面根节点按 cuisineId 注入该菜系的视觉主题（--t-* 变量），
+ *   页面背景、代表强调、聊天区与主按钮都和转场圆保持同一套颜色；
+ * - 聊天请求携带 cuisineId，服务端校验后选择该菜系的系统提示词；
+ * - 只有用户主动点代表菜上的「切换到聊天」，才会换到那道菜的角色聊天。
  */
 export default function CuisinePage() {
   const { cuisineId } = useParams()
-  const cuisine = cuisineId ? cuisineMap[cuisineId] : undefined
+  const location = useLocation()
+  const cuisine = getCuisine(cuisineId)
+  const { back } = useCircularTransition()
+  /** 由圆形揭示转场送进来的落地页：跳过入场编排，与预览层保持同一画面 */
+  const arrival = useWorldArrivalClass(location.pathname)
 
   if (!cuisine) {
     return (
@@ -29,14 +44,29 @@ export default function CuisinePage() {
     )
   }
 
+  const theme = getVisualTheme(cuisine.id)
   const related = relatedCharactersOfCuisine(cuisine)
   const others = cuisines.filter((item) => item.id !== cuisine.id)
   const firstDish = cuisine.representativeDishes[0]
-  const heroCharacter = related[0]
 
   return (
-    <main className="page">
+    <main
+      className={`page theme-page${arrival ? ` ${arrival}` : ''}`}
+      data-theme-id={cuisine.id}
+      style={themeVars(theme) as CSSProperties}
+    >
       <div className="container">
+        <Reveal>
+          <div className="page-back-row">
+            <Link to="/personalities#cuisines" className="back-link">
+              ← 返回八大菜系
+            </Link>
+            <button type="button" className="back-link back-link--home" onClick={() => back('/')}>
+              <span aria-hidden="true">⌂</span> 回到首页
+            </button>
+          </div>
+        </Reveal>
+
         <Reveal>
           <div className="cat-hero">
             <div className="cat-hero__visual">
@@ -60,21 +90,13 @@ export default function CuisinePage() {
                 <span className="chip chip--accent">{cuisine.personalityTag}</span>
                 <span className="chip">地域 · {cuisine.region}</span>
               </div>
+              <p className="cat-hero__persona">AI 人格：{cuisine.personalityDesc}</p>
               <div className="cat-hero__actions">
-                {heroCharacter ? (
-                  <Link to={`/chat/${heroCharacter.id}`} className="btn btn--primary">
-                    和{heroCharacter.name}聊聊 <span className="arrow">→</span>
-                  </Link>
-                ) : (
-                  <Link
-                    to={`/recipe?dish=${encodeURIComponent(firstDish.name)}`}
-                    className="btn btn--primary"
-                  >
-                    生成「{firstDish.name}」菜谱 <span className="arrow">→</span>
-                  </Link>
-                )}
-                <Link to="/personalities#cuisines" className="btn btn--ghost">
-                  返回八大菜系
+                <Link to="#cuisine-chat" className="btn btn--primary">
+                  和{cuisine.name} AI 聊聊天 <span className="arrow">→</span>
+                </Link>
+                <Link to={`/recommend?cuisine=${cuisine.id}`} className="btn btn--ghost">
+                  按{cuisine.name}推荐一顿
                 </Link>
               </div>
             </div>
@@ -84,11 +106,28 @@ export default function CuisinePage() {
         <section className="section section--tight">
           <div className="section-head">
             <div className="section-head__copy">
+              <span className="eyebrow">CUISINE CHAT</span>
+              <h2 className="h2">菜系专属对话</h2>
+            </div>
+            <p className="section-head__aside">
+              聊天对象就是{cuisine.name}本身（{cuisine.personalityTag}），由服务端按 cuisineId 载入专属提示词；
+              不点代表菜，它就一直是{cuisine.name}。
+            </p>
+          </div>
+          <Reveal>
+            <CuisineChat key={cuisine.id} cuisine={cuisine} />
+          </Reveal>
+        </section>
+
+        <section className="section section--tight">
+          <div className="section-head">
+            <div className="section-head__copy">
               <span className="eyebrow">DISHES</span>
               <h2 className="h2">代表菜</h2>
             </div>
             <p className="section-head__aside">
-              每道菜都可以有自己的 AI 人格。已有角色的直接开聊，没有的也能先让 AI 菜谱带你做出来。
+              每道代表菜都可能有自己的 AI 角色。点「切换到聊天」才会换成那道菜，
+              不点就继续和{cuisine.name}聊。
             </p>
           </div>
 
@@ -96,7 +135,7 @@ export default function CuisinePage() {
             {cuisine.representativeDishes.map((dish, index) => {
               const character = dish.characterId ? characterMap[dish.characterId] : undefined
               return (
-                <Reveal key={dish.name} delay={index * 45}>
+                <Reveal key={dish.id} delay={index * 45}>
                   <article className="cuisine-dish">
                     <div className="cuisine-dish__visual">
                       {dish.photo ? (
@@ -114,16 +153,28 @@ export default function CuisinePage() {
                       )}
                     </div>
                     <div className="cuisine-dish__body">
-                      <h3>{dish.name}</h3>
+                      <h3>
+                        {dish.dishId ? (
+                          <Link to={`/dishes/${dish.dishId}`}>{dish.name}</Link>
+                        ) : (
+                          dish.name
+                        )}
+                      </h3>
+                      <p className="cuisine-dish__desc">{dish.desc}</p>
                       <p className="cuisine-dish__meta">
                         {character
-                          ? `同名角色：${character.name} · ${character.tagline}`
-                          : '代表菜 · 暂无专属角色'}
+                          ? `菜品角色：${character.name} · ${character.tagline}`
+                          : '菜品角色还在酝酿 · 可以先生成菜谱'}
                       </p>
                       <div className="cuisine-dish__actions">
+                        {dish.dishId && (
+                          <Link to={`/dishes/${dish.dishId}`} className="btn btn--ghost btn--sm">
+                            图鉴详情 <span className="arrow">→</span>
+                          </Link>
+                        )}
                         {character && (
                           <Link to={`/chat/${character.id}`} className="btn btn--ghost btn--sm">
-                            和 TA 聊天 <span className="arrow">→</span>
+                            切换到「{character.name}」聊天 <span className="arrow">→</span>
                           </Link>
                         )}
                         <Link
@@ -162,9 +213,12 @@ export default function CuisinePage() {
             </div>
           ) : (
             <div className="page-note">
-              <h3>「{cuisine.name}」的专属角色还在酝酿</h3>
+              <h3>「{cuisine.name}」的独立角色还在酝酿</h3>
               <ul>
-                <li>八大菜系是文化分类，不等于八个固定角色；{cuisine.name}的专属人格会在后续逐步入场。</li>
+                <li>
+                  页面顶部的聊天区已经可以跟{cuisine.name}菜系 AI 人格直接对话；八大菜系是文化分类，
+                  单独的「菜品角色」会在后续逐步入场。
+                </li>
                 <li>
                   你可以先去「美食人格宇宙」认识现有的十七位角色，或让 AI 菜谱先带你做一道
                   {firstDish.name}。
